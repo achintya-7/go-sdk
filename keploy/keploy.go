@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"path/filepath"
 
 	"github.com/creasty/defaults"
@@ -102,13 +103,14 @@ type AppConfig struct {
 	Filter   Filter
 	TestPath string `default:""`
 	MockPath string `default:""`
+	LogPath  string
 }
 
 type Filter struct {
 	AcceptUrlRegex string
 	HeaderRegex    []string
-	Remove   	   []string
-	Replace 	   map[string]string
+	Remove         []string
+	Replace        map[string]string
 	RejectUrlRegex []string
 }
 
@@ -140,6 +142,17 @@ func New(cfg Config) *Keploy {
 	err = validate.Struct(&cfg)
 	if err != nil {
 		logger.Error("conf missing important field", zap.Error(err))
+	}
+
+	if cfg.App.LogPath != "" {
+		fmt.Println("log path", cfg.App.LogPath)
+		file, err := os.OpenFile("logs/app.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer file.Close()
+
+		log.SetOutput(file)
 	}
 
 	if len(cfg.App.TestPath) > 0 && cfg.App.TestPath[0] != '/' {
@@ -285,7 +298,7 @@ func (k *Keploy) PutRespGrpc(id string, resp GrpcResp) {
 // Capture will capture request, response and output of external dependencies by making Call to keploy server.
 func (k *Keploy) Capture(req regression.TestCaseReq) {
 	// req.Path, _ = os.Getwd()
-	req.Remove = k.cfg.App.Filter.Remove //Setting the Remove field from config
+	req.Remove = k.cfg.App.Filter.Remove   //Setting the Remove field from config
 	req.Replace = k.cfg.App.Filter.Replace //Setting the Replace field from config
 	go k.put(req)
 }
